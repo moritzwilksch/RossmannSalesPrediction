@@ -1,5 +1,6 @@
 #%%
 import pandas as pd
+from typing import Tuple
 root_path = "../"
 
 def fix_df(data: pd.DataFrame) -> pd.DataFrame:
@@ -11,7 +12,7 @@ def fix_df(data: pd.DataFrame) -> pd.DataFrame:
     data["date"] = data['date'].astype('datetime64')
     data['stateholiday'] = (
         data['stateholiday']
-        # .map({0: 'None', '0': 'no', 'a': 'public', 'b': 'easter', 'c': 'xmas'})
+        .map({0: 'no', '0': 'no', 'a': 'public', 'b': 'easter', 'c': 'xmas'})
         .astype('category')
         )
 
@@ -41,9 +42,14 @@ def timeseries_ttsplit(data: pd.DataFrame, train_pct=0.8) -> pd.DataFrame:
     return xtrain, xval, ytrain, yval
 
 
-def prep_for_inference(data: pd.DataFrame) -> pd.DataFrame:
+def prep_for_model(x: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
     """
     - Removes `customers` as it is not known @ inference.
     - Removes exact `date` to prevent date memorization.
+    - Removes samples with open == 0
     """
-    pass
+    open_mask = (x.open != 0)
+    x = x.loc[open_mask, :]
+    x = x.drop(['customers_x', 'date', 'open'], axis=1)
+    y = y[open_mask]
+    return x, y

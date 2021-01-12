@@ -36,19 +36,21 @@ def add_avg_sales_per_store(data: pd.DataFrame, xtrain: pd.DataFrame, ytrain: pd
     return pd.merge(data, per_store, left_on='store', right_index=True)
 
 
-if __name__ == "__main__":
-    train = pd.read_csv(root_path + 'data/train.csv')
-    train = fix_df(train)
-    xtrain, xval, ytrain, yval = timeseries_ttsplit(train)
+def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
+    catcols = "storetype assortment promointerval".split()
+    
+    store = pd.read_csv(root_path + "data/store.csv", index_col='Store')
+    store.columns = [col.lower() for col in store.columns]
 
-    print(
-        xtrain
-        .pipe(add_avg_customers_per_store, train_data=xtrain)
-        .pipe(add_avg_sales_per_store, xtrain=xtrain, ytrain=ytrain)
-    )
+    store[catcols] = store[catcols].astype('category')
 
-    print(
-        xval
-        .pipe(add_avg_customers_per_store, train_data=xtrain)
-        .pipe(add_avg_sales_per_store, xtrain=xtrain, ytrain=ytrain)
-    )
+    # add no regular promo
+    store['promointerval'].cat.add_categories('NotRegular', inplace=True)
+    store['promointerval'] = store['promointerval'].fillna('NotRegular')
+
+    store = store.drop("competitionopensincemonth competitionopensinceyear promo2sinceweek promo2sinceyear".split(), axis=1)
+
+    # impute competition distance to median of train set
+    store['competitiondistance'] = store['competitiondistance'].fillna(2330.0)
+
+    return pd.merge(data, store, how='left', left_on='store', right_index=True)
