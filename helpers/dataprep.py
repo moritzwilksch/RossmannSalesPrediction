@@ -47,9 +47,14 @@ def prep_for_model(x: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Seri
     - Removes `customers` as it is not known @ inference.
     - Removes exact `date` to prevent date memorization.
     - Removes samples with open == 0
+    - Removes samples with sales == 0
     """
     open_mask = (x.open != 0)
-    x = x.loc[open_mask, :]
+    sales_mask = (y > 1e-9)
+
+    mask = (open_mask & sales_mask)
+
+    x = x.loc[mask, :]
     x = x.drop(['customers_x', 'date', 'open'], axis=1)
-    y = y[open_mask]
+    y = y[mask]
     return x, y

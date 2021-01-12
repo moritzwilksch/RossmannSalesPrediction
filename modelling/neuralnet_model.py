@@ -8,6 +8,8 @@ from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df,
 from RossmannSalesPrediction.helpers import feature_engineering
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 
 root_path = "../"
@@ -78,23 +80,39 @@ from tensorflow import keras
 
 dimtable = {k: v for k, v in zip(embedding_fts, [xtrain_nn[col].nunique() for col in embedding_fts])}
 #%%
-num_input = keras.layers.Input(shape=(xtrain_nn_num.shape[1], ))
-emb_input = keras.layers.Input(shape=(xtrain_nn_emb.shape[1], ))
+num_input = keras.Input(shape=(xtrain_nn_num.shape[1], ))
+emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 
-emb_layers = [keras.layers.Embedding(input_dim=dimtable[col], output_dim=int(np.ceil(np.sqrt(dimtable[col]))))(emb_input[:, idx]) for idx, col in enumerate(embedding_fts)]
+
+emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=int(np.ceil(np.sqrt(dimtable[col]))*2))(emb_inputs[idx]) for idx, col in enumerate(embedding_fts)]
 
 dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
-#flat = keras.layers.Flatten()(emb_layers + dense1)
-concat = keras.layers.Concatenate()(emb_layers + [dense1])
-dense2 = keras.layers.Dense(units=64, activation = 'relu')(concat)
-out = keras.layers.Dense(units=1, activation='linear')(dense2)
+flats = [keras.layers.Flatten()(x) for x in emb_layers + [dense1]]
+concat = keras.layers.Concatenate()(flats)
+hidden_dense = keras.layers.Dense(units=256, activation = 'relu')(concat)
+#hidden_dense = keras.layers.Dense(units=128, activation = 'relu')(hidden_dense)
+hidden_dense = keras.layers.Dense(units=64, activation = 'relu')(hidden_dense)
+out = keras.layers.Dense(units=1, activation='linear')(hidden_dense)
 
-model: keras.Model = keras.Model(inputs=[emb_input, num_input], outputs=out)
+model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
 
 #%%
 model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mean_squared_error'])
 
-train_tup = (xtrain_nn_emb, xtrain_nn_num)
-val_tup = (xval_nn_emb, xval_nn_num)
+train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
+val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 
-model.fit(x=train_tup, y=ytrain, validation_data=(val_tup, yval) ,epochs=5)
+hist = model.fit(x=train_in, y=ytrain, validation_data=(val_in, yval), epochs=5, batch_size=64)
+
+#%%
+plt.plot(hist.history['loss'], label='train')
+plt.plot(hist.history['val_loss'], label='val')
+plt.legend()
+
+#%%
+preds = model.predict(val_in)
+
+#%%
+from RossmannSalesPrediction.helpers.evaluation import rmspcte
+
+rmspcte(yval, preds)

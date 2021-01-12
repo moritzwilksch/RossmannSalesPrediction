@@ -10,5 +10,7 @@ def rmspcte(real, pred):
 
     if type(pred) != np.ndarray:
         pred = pred.values
-        
-    return np.sqrt(np.mean(((real-pred)/real)**2))**0.5
+
+    real, pred = real.flatten(), pred.flatten()
+
+    return np.sqrt(np.mean(((real-pred)/real)**2))
