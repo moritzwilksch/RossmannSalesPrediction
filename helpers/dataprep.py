@@ -1,5 +1,4 @@
 #%%
-from catboost import CatboostError
 import pandas as pd
 root_path = "../"
 
@@ -12,7 +11,7 @@ def fix_df(data: pd.DataFrame) -> pd.DataFrame:
     data["date"] = data['date'].astype('datetime64')
     data['stateholiday'] = (
         data['stateholiday']
-        .map({0: 'None', '0': 'no', 'a': 'public', 'b': 'easter', 'c': 'xmas'})
+        # .map({0: 'None', '0': 'no', 'a': 'public', 'b': 'easter', 'c': 'xmas'})
         .astype('category')
         )
 
@@ -21,38 +20,30 @@ def fix_df(data: pd.DataFrame) -> pd.DataFrame:
 
 
 
+def timeseries_ttsplit(data: pd.DataFrame, train_pct=0.8) -> pd.DataFrame:
+    """
+    Splits `data` into train & test using *first* `train_pct` percent *of days* as train data.
+    - Rounds to a full day, everything before is train, after is test.
+    """
+    data: pd.DataFrame = data.copy()
 
-
-
-#%%
-if __name__ == '__main__':
-    import numpy as np
-    def rmspcte(real, pred):
-        mask = ~(real == 0)
-        real, pred = real[mask], pred[mask]
-        return np.sqrt(np.mean(((real.values-pred.values)/real.values)**2))**0.5
-
-    train = pd.read_csv(root_path + 'data/train.csv')
-    train = fix_df(train)
-    print(train.stateholiday.unique())
-
-    test = pd.read_csv(root_path + 'data/test.csv')
-    test = fix_df(test)
-
-    #train_test_thresh = train.date.min() + pd.Timedelta(753, unit="d")
-    #test = train.query("date >= @train_test_thresh")
-    #train = train.query("date < @train_test_thresh")
-
-
-    model = train.groupby('store')['sales'].mean().to_dict()
-
-    preds = test.store.map(model)
-
-    preds.index = preds.index+1
-    print(preds)
-    preds.to_csv(root_path + 'submission_meanonly.csv')
+    n_days_total = (data.date.max() - data.date.min()).days
+    n_days_train = int(train_pct * n_days_total)
+    thresh_date = data.date.min() + pd.Timedelta(n_days_train, unit='d')
     
+    train_mask = (data.date <= thresh_date)
+
+    xtrain = data.drop('sales', axis=1).loc[train_mask, :]
+    xval = data.drop('sales', axis=1).loc[~train_mask, :]
+    ytrain = data.loc[train_mask, 'sales']
+    yval = data.loc[~train_mask, 'sales']
+
+    return xtrain, xval, ytrain, yval
 
 
-
-
+def prep_for_inference(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    - Removes `customers` as it is not known @ inference.
+    - Removes exact `date` to prevent date memorization.
+    """
+    pass
