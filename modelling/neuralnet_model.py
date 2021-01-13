@@ -83,15 +83,24 @@ dimtable = {k: v for k, v in zip(embedding_fts, [xtrain_nn[col].nunique() for co
 num_input = keras.Input(shape=(xtrain_nn_num.shape[1], ))
 emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 
+emb_table = {
+    'store': 10,
+    'dayofweek': 3,
+    'stateholiday': 2,
+    'monthofyear': 3,
+    'storetype': 2,
+    'assortment': 2,
+    'promointerval': 2
+}
 
-emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=int(np.ceil(np.sqrt(dimtable[col]))*2))(emb_inputs[idx]) for idx, col in enumerate(embedding_fts)]
+emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=emb_table[col])(emb_inputs[idx]) for idx, col in enumerate(embedding_fts)]
 
-dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
-flats = [keras.layers.Flatten()(x) for x in emb_layers + [dense1]]
+#dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
+flats = [keras.layers.Flatten()(x) for x in emb_layers + [num_input]]
 concat = keras.layers.Concatenate()(flats)
-hidden_dense = keras.layers.Dense(units=256, activation = 'relu')(concat)
-#hidden_dense = keras.layers.Dense(units=128, activation = 'relu')(hidden_dense)
-hidden_dense = keras.layers.Dense(units=64, activation = 'relu')(hidden_dense)
+hidden_dense = keras.layers.Dense(units=1024, activation = 'sigmoid')(concat)
+#hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
+hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
 out = keras.layers.Dense(units=1, activation='linear')(hidden_dense)
 
 model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
@@ -102,7 +111,14 @@ model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mean_square
 train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
 val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 
-hist = model.fit(x=train_in, y=ytrain, validation_data=(val_in, yval), epochs=5, batch_size=64)
+# -> log -> SS y values
+y_ss = StandardScaler()
+y_ss.fit(np.log(ytrain.values.reshape(-1, 1)))
+ytrain_scaled = y_ss.transform(np.log(ytrain.values.reshape(-1, 1)))
+yval_scaled = y_ss.transform(np.log(yval.values.reshape(-1, 1)))
+
+
+hist = model.fit(x=train_in, y=ytrain_scaled.flatten(), validation_data=(val_in, yval_scaled.flatten()), epochs=10, batch_size=256)
 
 #%%
 plt.plot(hist.history['loss'], label='train')
