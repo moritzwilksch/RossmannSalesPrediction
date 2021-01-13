@@ -1,11 +1,11 @@
 # %%
+import pandas as pd
+from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
 import sys
 import pathlib
 
 from numpy.lib.index_tricks import IndexExpression
 sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
-from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
-import pandas as pd
 
 
 root_path = "../"
@@ -13,8 +13,9 @@ root_path = "../"
 # %%
 
 
-def add_monthofyear(data: pd.DataFrame) -> pd.DataFrame:
+def split_date(data: pd.DataFrame) -> pd.DataFrame:
     data['monthofyear'] = data.date.dt.month
+    data['dayofmonth'] = data.date.dt.day
     return data
 
 
@@ -38,7 +39,7 @@ def add_avg_sales_per_store(data: pd.DataFrame, xtrain: pd.DataFrame, ytrain: pd
 
 def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
     catcols = "storetype assortment promointerval".split()
-    
+
     store = pd.read_csv(root_path + "data/store.csv", index_col='Store')
     store.columns = [col.lower() for col in store.columns]
 

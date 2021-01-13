@@ -2,8 +2,8 @@
 import sys
 import pathlib
 
-from numpy.lib.index_tricks import IndexExpression
 sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
+
 from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df, prep_for_model
 from RossmannSalesPrediction.helpers import feature_engineering
 import pandas as pd
@@ -19,7 +19,7 @@ xtrain_raw, xval_raw, ytrain_raw, yval_raw = timeseries_ttsplit(train)
 
 xtrain, ytrain = (
     xtrain_raw
-    .pipe(feature_engineering.add_monthofyear)
+    .pipe(feature_engineering.split_date)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
@@ -29,7 +29,7 @@ xtrain, ytrain = (
 #%%
 xval, yval = (
     xval_raw
-    .pipe(feature_engineering.add_monthofyear)
+    .pipe(feature_engineering.split_date)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
