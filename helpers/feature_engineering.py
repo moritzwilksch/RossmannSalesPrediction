@@ -57,7 +57,7 @@ def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
     return pd.merge(data, store, how='left', left_on='store', right_index=True)
 
 
-def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int):
+def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int) -> pd.DataFrame:
     train = pd.concat((x, y), axis=1)
     train.set_index(x.index)
     sales_lookup = train[['store', 'date', 'sales']].copy()
@@ -74,9 +74,28 @@ def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int):
 
     return train_aug
 
+def add_moving_avg(x: pd.DataFrame, y: pd.Series, size: int) -> pd.DataFrame:
+        train = pd.concat((x, y), axis=1)
+        #train.set_index(x.index)
+        join_table = (
+            train
+            #.sort_values(['store', 'date'])
+            .groupby('store')[['sales', 'date']]
+            .rolling(size, min_periods=1)
+            .mean()
+            .reset_index()
+            .set_index('level_1')
+            .rename({'sales': f'ma_{size}'}, axis=1)
+            )
+        return (
+            pd.merge(x, join_table, left_index=True, right_index=True, how='left')
+            .drop('store_y', axis=1)
+            .rename({'store_x': 'store'}, axis=1)
+            )
 
-#%%
+
+"""#%%
 root_path = "../"
 train = pd.read_csv(root_path + 'data/train.csv')
 train = fix_df(train)
-add_time_lag(train.drop('sales', axis=1), train.sales, 1)
+add_moving_avg(train.drop('sales', axis=1), train.sales, 7)"""

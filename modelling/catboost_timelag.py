@@ -29,9 +29,10 @@ xtrain_raw, xval_raw, ytrain_raw, yval_raw = timeseries_ttsplit(train)
 
 xtrain, ytrain = (
     xtrain_raw
-    .pipe(feature_engineering.add_time_lag, lag=1, y=ytrain_raw)
-    .pipe(feature_engineering.add_time_lag, lag=7, y=ytrain_raw)
-    .dropna()
+    #.pipe(feature_engineering.add_time_lag, lag=1, y=ytrain_raw)
+    #.pipe(feature_engineering.add_time_lag, lag=7, y=ytrain_raw)
+    #.dropna()
+    .pipe(feature_engineering.add_moving_avg, size=7, y=ytrain_raw)
     .pipe(feature_engineering.split_date)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
@@ -42,9 +43,10 @@ xtrain, ytrain = (
 #%%
 xval, yval = (
     xval_raw
-    .pipe(feature_engineering.add_time_lag, lag=1, y=yval_raw)
-    .pipe(feature_engineering.add_time_lag, lag=7, y=yval_raw)
-    .dropna()
+    #.pipe(feature_engineering.add_time_lag, lag=1, y=yval_raw)
+    #.pipe(feature_engineering.add_time_lag, lag=7, y=yval_raw)
+    #.dropna()
+    .pipe(feature_engineering.add_moving_avg, size=7, y=yval_raw)
     .pipe(feature_engineering.split_date)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
