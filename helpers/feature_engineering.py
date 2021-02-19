@@ -1,11 +1,11 @@
 # %%
-import pandas as pd
-from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
 import sys
 import pathlib
+sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
+import pandas as pd
+from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
 
 from numpy.lib.index_tricks import IndexExpression
-sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
 
 
 root_path = "../"
@@ -55,3 +55,28 @@ def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
     store['competitiondistance'] = store['competitiondistance'].fillna(2330.0)
 
     return pd.merge(data, store, how='left', left_on='store', right_index=True)
+
+
+def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int):
+    train = pd.concat((x, y), axis=1)
+    train.set_index(x.index)
+    sales_lookup = train[['store', 'date', 'sales']].copy()
+    sales_lookup = sales_lookup.assign(joindate=sales_lookup.date + pd.Timedelta(lag, 'd'))
+
+    train_aug = (
+        pd
+        .merge(train, sales_lookup.drop(['date'], axis=1), how='left', left_on=['store', 'date'], right_on=['store', 'joindate'])
+        .rename({'sales_y': f'sales_prev{lag}'}, axis=1)
+        .rename({'sales_x': 'sales'}, axis=1)
+        .drop(['joindate', 'sales'], axis=1)
+        .set_index(x.index)
+    )
+
+    return train_aug
+
+
+#%%
+root_path = "../"
+train = pd.read_csv(root_path + 'data/train.csv')
+train = fix_df(train)
+add_time_lag(train.drop('sales', axis=1), train.sales, 1)
