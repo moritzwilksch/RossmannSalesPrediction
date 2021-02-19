@@ -92,7 +92,7 @@ num_input = keras.Input(shape=(xtrain_nn_num.shape[1], ))
 emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 
 emb_table = {
-    'store': 10,
+    'store': 50,
     'dayofweek': 6,
     'stateholiday': 2,
     'monthofyear': 6,
