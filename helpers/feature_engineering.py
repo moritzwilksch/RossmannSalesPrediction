@@ -8,7 +8,7 @@ from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
 from numpy.lib.index_tricks import IndexExpression
 
 
-root_path = "../"
+root_path = "../../"
 
 # %%
 
