@@ -94,6 +94,32 @@ def add_moving_avg(x: pd.DataFrame, y: pd.Series, size: int) -> pd.DataFrame:
             )
 
 
+def time_elapsed(data: pd.DataFrame, column: str, mode: str) -> pd.DataFrame:
+    """- mode: 'forward' or 'backward'"""
+    data = data.copy()
+    event_dates = data.loc[data[column] != 0].date
+
+    result = []
+    for row in data.itertuples():
+        deltas = (row.date - event_dates)
+        if mode == 'forward':
+            result.append(deltas[deltas <= pd.to_timedelta(0, 'D')].max())
+        elif mode == 'backward':
+            result.append(deltas[deltas >= pd.to_timedelta(0, 'D')].min())
+
+    fill_value = pd.Series(result).min() if mode == 'forward' else pd.Series(result).max()
+
+    name = 'fwd' if mode == 'forward' else 'backwd'
+    data[f"elapsed_{column}_{name}"] = result
+    data[f"elapsed_{column}_{name}"] = data[f"elapsed_{column}_{name}"].fillna(pd.to_timedelta(fill_value, 'D'))
+    data[f"elapsed_{column}_{name}"] = data[f"elapsed_{column}_{name}"].dt.days
+
+    return data
+
+
+
+
+
 """#%%
 root_path = "../"
 train = pd.read_csv(root_path + 'data/train.csv')

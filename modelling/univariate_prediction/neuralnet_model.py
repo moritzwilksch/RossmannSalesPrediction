@@ -1,9 +1,8 @@
 # %%
-from os import O_DIRECTORY
 import sys
 import pathlib
 
-sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
+sys.path.append(str(pathlib.Path("..").resolve().parent.parent))
 from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df, prep_for_model
 from RossmannSalesPrediction.helpers import feature_engineering
 import pandas as pd
@@ -12,7 +11,7 @@ import matplotlib.pyplot as plt
 
 
 
-root_path = "../"
+root_path = "../../"
 
 #%%
 train = pd.read_csv(root_path + 'data/train.csv')
@@ -84,7 +83,7 @@ num_input = keras.Input(shape=(xtrain_nn_num.shape[1], ))
 emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 
 emb_table = {
-    'store': 10,
+    'store': 100,
     'dayofweek': 6,
     'stateholiday': 2,
     'monthofyear': 6,
@@ -99,7 +98,7 @@ emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=emb_t
 #dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
 flats = [keras.layers.Flatten()(x) for x in emb_layers + [num_input]]
 concat = keras.layers.Concatenate()(flats)
-hidden_dense = keras.layers.Dense(units=1024, activation = 'sigmoid')(concat)
+hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(concat)
 #hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
 hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
 out = keras.layers.Dense(units=1, activation='linear')(hidden_dense)
@@ -113,20 +112,20 @@ train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn
 val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 
 # -> log -> SS y values
-y_ss = StandardScaler()
-y_ss.fit(np.log(ytrain.values.reshape(-1, 1)))
-ytrain_scaled = y_ss.transform(np.log(ytrain.values.reshape(-1, 1)))
-yval_scaled = y_ss.transform(np.log(yval.values.reshape(-1, 1)))
+#y_ss = StandardScaler()
+#y_ss.fit(np.log(ytrain.values.reshape(-1, 1)))
+#ytrain_scaled = y_ss.transform(np.log(ytrain.values.reshape(-1, 1)))
+#yval_scaled = y_ss.transform(np.log(yval.values.reshape(-1, 1)))
 
 #%%
 from RossmannSalesPrediction.helpers import lr_finder
 lrf = lr_finder.LRFinder(1e-6, 1e-1)
 
-model.fit(x=train_in, y=ytrain_scaled.flatten(), callbacks=[lrf], validation_data=(val_in, yval_scaled.flatten()), epochs=1, batch_size=256)
+model.fit(x=train_in, y=ytrain.values.flatten(), callbacks=[lrf], validation_data=(val_in, yval.values.flatten()), epochs=1, batch_size=256)
 #%%
-model.compile(optimizer=keras.optimizers.Adam(10**-4), loss='mean_squared_error', metrics=['mean_squared_error'])
+model.compile(optimizer=keras.optimizers.Adam(), loss='mean_absolute_percentage_error', metrics=['mean_absolute_percentage_error'])
 
-hist = model.fit(x=train_in, y=ytrain_scaled.flatten(), validation_data=(val_in, yval_scaled.flatten()), epochs=5, batch_size=256)
+hist = model.fit(x=train_in, y=ytrain.values.flatten(), validation_data=(val_in, yval.values.flatten()), epochs=5, batch_size=512)
 
 #%%
 plt.plot(hist.history['loss'], label='train')
