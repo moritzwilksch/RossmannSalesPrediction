@@ -16,6 +16,18 @@ root_path = "../../"
 #%%
 train = pd.read_csv(root_path + 'data/train.csv')
 train = fix_df(train)
+
+# ADD ELAPSED
+promo_elapsed = (
+    train.groupby('date').mean().reset_index()
+    .pipe(feature_engineering.time_elapsed, 'promo', 'forward')
+    .pipe(feature_engineering.time_elapsed, 'promo', 'backward')
+    [['date', 'elapsed_promo_fwd', 'elapsed_promo_backwd']]
+)
+
+train = pd.merge(train, promo_elapsed, on=["date"], how='left')
+
+
 xtrain_raw, xval_raw, ytrain_raw, yval_raw = timeseries_ttsplit(train)
 
 
@@ -39,11 +51,12 @@ xval, yval = (
 )
 
 #%%
-embedding_fts = "store dayofweek stateholiday monthofyear dayofmonth storetype assortment promointerval".split()
+embedding_fts = "store dayofweek stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
 
-to_be_encoded = "stateholiday storetype assortment promointerval".split()
-to_be_scaled = "avg_store_customers avg_store_sales competitiondistance".split()
-leaveasis = "store dayofweek promo schoolholiday monthofyear dayofmonth promo2".split()
+to_be_encoded = embedding_fts#"stateholiday storetype assortment promointerval weekofyear".split()
+to_be_scaled = "avg_store_customers avg_store_sales competitiondistance elapsed_promo_fwd elapsed_promo_backwd".split()
+leaveasis = "promo schoolholiday promo2".split()
+#leaveasis = [x for x in leaveasis if x not in embedding_fts]
 
 #%%
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
@@ -87,6 +100,7 @@ emb_table = {
     'dayofweek': 6,
     'stateholiday': 2,
     'monthofyear': 6,
+    'weekofyear': 25,
     'dayofmonth': 10,
     'storetype': 2,
     'assortment': 2,

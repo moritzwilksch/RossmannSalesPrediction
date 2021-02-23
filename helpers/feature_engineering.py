@@ -16,6 +16,7 @@ root_path = "../../"
 def split_date(data: pd.DataFrame) -> pd.DataFrame:
     data['monthofyear'] = data.date.dt.month
     data['dayofmonth'] = data.date.dt.day
+    data['weekofyear'] = data.date.dt.isocalendar().week
     return data
 
 
