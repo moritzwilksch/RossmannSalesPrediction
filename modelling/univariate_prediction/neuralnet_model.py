@@ -155,3 +155,51 @@ preds = model.predict(val_in)
 from RossmannSalesPrediction.helpers.evaluation import rmspcte
 
 rmspcte(yval, preds)
+
+
+#%%
+if False:
+    # TEST SUBMISSION
+
+    test_raw = pd.read_csv(root_path + "data/test.csv").drop('Id', axis=1).reset_index(drop=True)
+    test = fix_df(test_raw.copy())
+
+
+    promo_elapsed = (
+        test.groupby('date').mean().reset_index()
+        .pipe(feature_engineering.time_elapsed, 'promo', 'forward')
+        .pipe(feature_engineering.time_elapsed, 'promo', 'backward')
+        .pipe(feature_engineering.time_elapsed, 'schoolholiday', 'forward')
+        .pipe(feature_engineering.time_elapsed, 'schoolholiday', 'backward')
+        [['date', 'elapsed_promo_fwd', 'elapsed_promo_backwd', 'elapsed_schoolholiday_fwd', 'elapsed_schoolholiday_backwd']]
+    )
+
+    test = pd.merge(test, promo_elapsed, on=["date"], how='left')
+
+
+    test = (
+        test
+        .pipe(feature_engineering.split_date)
+        .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
+        .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
+        .pipe(feature_engineering.join_store_details)
+        .drop(['date', 'open'], axis=1)
+        .rename({'customers': 'avg_store_customers'}, axis=1)
+    )
+
+    embedding_fts = "store dayofweek stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
+
+    to_be_encoded = embedding_fts
+    to_be_scaled = "avg_store_customers avg_store_sales competitiondistance elapsed_promo_fwd elapsed_promo_backwd elapsed_schoolholiday_fwd elapsed_schoolholiday_backwd".split()
+    leaveasis = "promo schoolholiday promo2".split()
+
+
+    #%%
+    xtest_nn = pd.DataFrame(ct.transform(test), columns=leaveasis + to_be_encoded + to_be_scaled)
+
+
+    xtest_nn_num = xtest_nn.loc[:, ~xtest_nn.columns.isin(embedding_fts)].values.astype(np.float64)
+    xtest_nn_emb = xtest_nn.loc[:, embedding_fts].values.astype(np.long)
+    test_in = np.split(xtest_nn_emb, xtest_nn_emb.shape[-1], axis=1) + [xtest_nn_num]
+
+    preds = model.predict(test_in)
