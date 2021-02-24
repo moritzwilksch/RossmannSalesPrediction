@@ -1,11 +1,10 @@
 # %%
+from numpy.lib.index_tricks import IndexExpression
+from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
+import pandas as pd
 import sys
 import pathlib
-sys.path.append(str(pathlib.Path(".").resolve().parent.parent))
-import pandas as pd
-from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df
-
-from numpy.lib.index_tricks import IndexExpression
+sys.path.append(str(pathlib.Path("..").resolve().parent.parent))
 
 
 root_path = "../../"
@@ -24,7 +23,7 @@ def split_date(data: pd.DataFrame) -> pd.DataFrame:
 def add_avg_customers_per_store(data: pd.DataFrame, train_data: pd.DataFrame) -> pd.DataFrame:
     """Calculates mean customers per store on `train_data` and joins to `data` on store id"""
     per_store = train_data.groupby('store')['customers'].mean().to_frame()
-    return pd.merge(data, per_store, left_on='store', right_index=True).rename({'customers_y': 'avg_store_customers'}, axis=1)
+    return pd.merge(data, per_store, left_on='store', right_index=True, how='left').rename({'customers_y': 'avg_store_customers'}, axis=1)
 
 
 def add_avg_sales_per_store(data: pd.DataFrame, xtrain: pd.DataFrame, ytrain: pd.DataFrame) -> pd.DataFrame:
@@ -36,7 +35,7 @@ def add_avg_sales_per_store(data: pd.DataFrame, xtrain: pd.DataFrame, ytrain: pd
     xandy = pd.concat([xtrain, ytrain], axis=1)
     per_store = xandy.groupby('store')['sales'].mean().to_frame().rename({'sales': 'avg_store_sales'}, axis=1)
 
-    return pd.merge(data, per_store, left_on='store', right_index=True)
+    return pd.merge(data, per_store, left_on='store', how='left', right_index=True)
 
 
 def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
@@ -76,24 +75,25 @@ def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int) -> pd.DataFrame:
 
     return train_aug
 
+
 def add_moving_avg(x: pd.DataFrame, y: pd.Series, size: int) -> pd.DataFrame:
-        train = pd.concat((x, y), axis=1)
-        #train.set_index(x.index)
-        join_table = (
-            train
-            #.sort_values(['store', 'date'])
-            .groupby('store')[['sales', 'date']]
-            .rolling(size, min_periods=1)
-            .mean()
-            .reset_index()
-            .set_index('level_1')
-            .rename({'sales': f'ma_{size}'}, axis=1)
-            )
-        return (
-            pd.merge(x, join_table, left_index=True, right_index=True, how='left')
-            .drop('store_y', axis=1)
-            .rename({'store_x': 'store'}, axis=1)
-            )
+    train = pd.concat((x, y), axis=1)
+    #train.set_index(x.index)
+    join_table = (
+        train
+        #.sort_values(['store', 'date'])
+        .groupby('store')[['sales', 'date']]
+        .rolling(size, min_periods=1)
+        .mean()
+        .reset_index()
+        .set_index('level_1')
+        .rename({'sales': f'ma_{size}'}, axis=1)
+    )
+    return (
+        pd.merge(x, join_table, left_index=True, right_index=True, how='left')
+        .drop('store_y', axis=1)
+        .rename({'store_x': 'store'}, axis=1)
+    )
 
 
 def time_elapsed(data: pd.DataFrame, column: str, mode: str) -> pd.DataFrame:
@@ -117,9 +117,6 @@ def time_elapsed(data: pd.DataFrame, column: str, mode: str) -> pd.DataFrame:
     data[f"elapsed_{column}_{name}"] = data[f"elapsed_{column}_{name}"].dt.days
 
     return data
-
-
-
 
 
 """#%%

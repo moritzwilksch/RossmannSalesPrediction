@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Tuple
 root_path = "../"
 
+
 def fix_df(data: pd.DataFrame) -> pd.DataFrame:
     """
     Renames columns to lower case.
@@ -14,11 +15,9 @@ def fix_df(data: pd.DataFrame) -> pd.DataFrame:
         data['stateholiday']
         .map({0: 'no', '0': 'no', 'a': 'public', 'b': 'easter', 'c': 'xmas'})
         .astype('category')
-        )
-
+    )
 
     return data
-
 
 
 def timeseries_ttsplit(data: pd.DataFrame, train_pct=0.8) -> pd.DataFrame:
@@ -31,7 +30,7 @@ def timeseries_ttsplit(data: pd.DataFrame, train_pct=0.8) -> pd.DataFrame:
     n_days_total = (data.date.max() - data.date.min()).days
     n_days_train = int(train_pct * n_days_total)
     thresh_date = data.date.min() + pd.Timedelta(n_days_train, unit='d')
-    
+
     train_mask = (data.date <= thresh_date)
 
     xtrain = data.drop('sales', axis=1).loc[train_mask, :]
@@ -49,12 +48,15 @@ def prep_for_model(x: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Seri
     - Removes samples with open == 0
     - Removes samples with sales == 0
     """
+    x = x.reset_index(drop=True)
+    y = y.reset_index(drop=True)
+
     open_mask = (x.open != 0)
     sales_mask = (y > 1e-9)
 
-    mask = (open_mask & sales_mask)
+    mask = (open_mask & sales_mask).values
 
     x = x.loc[mask, :]
     x = x.drop(['customers_x', 'date', 'open'], axis=1)
     y = y[mask]
-    return x, y
+    return x.reset_index(drop=True), y.reset_index(drop=True)
