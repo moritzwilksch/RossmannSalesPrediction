@@ -36,6 +36,7 @@ xtrain_raw, xval_raw, ytrain_raw, yval_raw = timeseries_ttsplit(train)
 xtrain, ytrain = (
     xtrain_raw
     .pipe(feature_engineering.split_date)
+    .assign(dayofyear = xtrain_raw.date.dt.dayofyear)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
@@ -46,6 +47,7 @@ xtrain, ytrain = (
 xval, yval = (
     xval_raw
     .pipe(feature_engineering.split_date)
+    .assign(dayofyear = xval_raw.date.dt.dayofyear)
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
@@ -53,7 +55,7 @@ xval, yval = (
 )
 
 #%%
-embedding_fts = "store dayofweek stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
+embedding_fts = "store dayofweek dayofyear stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
 
 to_be_encoded = embedding_fts#"stateholiday storetype assortment promointerval weekofyear".split()
 to_be_scaled = "avg_store_customers avg_store_sales competitiondistance elapsed_promo_fwd elapsed_promo_backwd".split()
@@ -100,6 +102,7 @@ emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 emb_table = {
     'store': 100,
     'dayofweek': 6,
+    'dayofyear': 50,
     'stateholiday': 2,
     'monthofyear': 6,
     'weekofyear': 25,
@@ -114,10 +117,10 @@ emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=emb_t
 #dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
 flats = [keras.layers.Flatten()(x) for x in emb_layers + [num_input]]
 concat = keras.layers.Concatenate()(flats)
-hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(concat)
+hidden_dense = keras.layers.Dense(units=128, activation = 'sigmoid')(concat)
 #hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
-hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
-out = keras.layers.Dense(units=1, activation='linear')(hidden_dense)
+#hidden_dense = keras.layers.Dense(units=512, activation = 'sigmoid')(hidden_dense)
+out = keras.layers.Dense(units=1, activation='linear', bias_initializer=keras.initializers.Constant(ytrain.mean()))(hidden_dense)
 
 model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
 
@@ -137,7 +140,9 @@ val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 from RossmannSalesPrediction.helpers import lr_finder
 lrf = lr_finder.LRFinder(1e-6, 1e-1)
 
-model.fit(x=train_in, y=ytrain.values.flatten(), callbacks=[lrf], validation_data=(val_in, yval.values.flatten()), epochs=1, batch_size=256)
+# model.fit(x=train_in, y=ytrain.values.flatten(), callbacks=[lrf], validation_data=(val_in, yval.values.flatten()), epochs=1, batch_size=256)
+
+
 #%%
 model.compile(optimizer=keras.optimizers.Adam(), loss=rmspe_loss, metrics=[rmspe_loss])
 
