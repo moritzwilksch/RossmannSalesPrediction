@@ -1,4 +1,5 @@
 # %%
+import seaborn as sns
 import sys
 import pathlib
 from typing import Union
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from RossmannSalesPrediction.helpers import feature_engineering
+from helpers.evaluation import rmspe_loss
 
 
 root_path = "../../"
@@ -55,14 +57,14 @@ xval = feature_engineering.split_date(xval_raw).drop('date', axis=1)
 
 #%%
 # -> log -> SS y values
-y_ss = StandardScaler()
-y_ss.fit(ytrain)
-ytrain_scaled = y_ss.transform(ytrain)
-yval_scaled = y_ss.transform(yval)
+#y_ss = StandardScaler()
+#y_ss.fit(ytrain)
+#ytrain_scaled = y_ss.transform(ytrain)
+#yval_scaled = y_ss.transform(yval)
 
 
 #%%
-embedding_fts = "dayofweek monthofyear dayofmonth".split()
+embedding_fts = "dayofweek monthofyear dayofmonth weekofyear".split()
 to_scale = ['elapsed_promo_fwd',
             'elapsed_promo_backwd', 'elapsed_schoolholiday_fwd',
             'elapsed_schoolholiday_backwd']
@@ -81,11 +83,11 @@ xval_nn = xval.copy()
 #%%
 # Train numeric/embedding split
 xtrain_nn_num = xtrain_nn.loc[:, ~xtrain_nn.columns.isin(embedding_fts)].values.astype(np.float64)
-xtrain_nn_emb = xtrain_nn.loc[:, embedding_fts].values
+xtrain_nn_emb = xtrain_nn.loc[:, embedding_fts].values.astype(np.long)
 
 # Validation numeric/embedding split
 xval_nn_num = xval_nn.loc[:, ~xval_nn.columns.isin(embedding_fts)].values.astype(np.float64)
-xval_nn_emb = xval_nn.loc[:, embedding_fts].values
+xval_nn_emb = xval_nn.loc[:, embedding_fts].values.astype(np.long)
 
 #%%
 
@@ -122,7 +124,7 @@ def objective(trial):
     mcp = ModelCheckpoint('.modelcheckpoint', save_best_only=True, save_weights_only=True)
 
 
-    model.compile(optimizer='adam', loss='mean_absolute_percentage_error', metrics=['mean_absolute_percentage_error'])
+    model.compile(optimizer='adam', loss=rmspe_loss, metrics=[rmspe_loss])
 
     train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
     val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
@@ -168,13 +170,14 @@ emb_table = {
     'dayofweek': 10, #6,
     'monthofyear': 15, #6,
     'dayofmonth': 10,
+    'weekofyear': 25
 }
 emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=emb_table[col])(emb_inputs[idx]) for idx, col in enumerate(embedding_fts)]
 
 #dense1 = keras.layers.Dense(units=64, activation='relu')(num_input)
 flats = [keras.layers.Flatten()(x) for x in emb_layers + [num_input]]
 concat = keras.layers.Concatenate()(flats)
-hidden_dense = keras.layers.Dense(units=128, activation='relu',)(concat)
+hidden_dense = keras.layers.Dense(units=512, activation='relu',)(concat)
 #hidden_dense = keras.layers.Dense(units=4024, activation='relu',)(hidden_dense)
 hidden_dense = keras.layers.Dense(units=4664, activation='relu',)(hidden_dense)
 out = keras.layers.Dense(units=1115, activation='linear')(hidden_dense)
@@ -185,26 +188,32 @@ model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
 from tensorflow.keras.callbacks import ModelCheckpoint
 
 mcp = ModelCheckpoint('.modelcheckpoint', save_best_only=True, save_weights_only=True)
-model.compile(optimizer=keras.optimizers.Adam(3e-4), loss='mean_absolute_percentage_error', metrics=['mean_absolute_percentage_error'])
+model.compile(optimizer=keras.optimizers.Adam(3e-4), loss=rmspe_loss, metrics=[rmspe_loss])
 
 train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
 val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 
 #%%
-hist = model.fit(x=train_in, y=ytrain_scaled, validation_data=(val_in, yval_scaled), epochs=10, batch_size=32, callbacks=[mcp])
+hist = model.fit(x=train_in, y=ytrain, validation_data=(val_in, yval), epochs=10, batch_size=32, callbacks=[mcp])
 
 model.load_weights(".modelcheckpoint")
 
 #%%
+
 plt.plot(hist.history['loss'], label='train')
 plt.plot(hist.history['val_loss'], label='val')
 plt.legend()
+plt.show()
+
+preds = model.predict(val_in)
+#preds = y_ss.inverse_transform(preds)
 
 
-#%%
-#%%
-preds = y_ss.inverse_transform(model.predict(val_in))
-rmspcte(yval, preds)
+print(rmspcte(yval, preds))
+
+sns.histplot(preds, color='orange')
+sns.histplot(yval)
+plt.show()
 
 
 #%%

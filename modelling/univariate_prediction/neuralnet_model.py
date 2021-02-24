@@ -1,4 +1,5 @@
 # %%
+import matplotlib.pyplot as plt
 import sys
 import pathlib
 
@@ -7,7 +8,8 @@ from RossmannSalesPrediction.helpers.dataprep import timeseries_ttsplit, fix_df,
 from RossmannSalesPrediction.helpers import feature_engineering
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from helpers.evaluation import rmspe_loss
+
 
 
 
@@ -137,7 +139,7 @@ lrf = lr_finder.LRFinder(1e-6, 1e-1)
 
 model.fit(x=train_in, y=ytrain.values.flatten(), callbacks=[lrf], validation_data=(val_in, yval.values.flatten()), epochs=1, batch_size=256)
 #%%
-model.compile(optimizer=keras.optimizers.Adam(), loss='mean_absolute_percentage_error', metrics=['mean_absolute_percentage_error'])
+model.compile(optimizer=keras.optimizers.Adam(), loss=rmspe_loss, metrics=[rmspe_loss])
 
 hist = model.fit(x=train_in, y=ytrain.values.flatten(), validation_data=(val_in, yval.values.flatten()), epochs=5, batch_size=512)
 
