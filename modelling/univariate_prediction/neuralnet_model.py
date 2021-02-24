@@ -248,7 +248,7 @@ if False:
         .rename({'customers': 'avg_store_customers'}, axis=1)
     )
 
-    embedding_fts = "store dayofweek stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
+    embedding_fts = "store dayofweek dayofyear stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
 
     to_be_encoded = embedding_fts
     to_be_scaled = "avg_store_customers avg_store_sales competitiondistance elapsed_promo_fwd elapsed_promo_backwd elapsed_schoolholiday_fwd elapsed_schoolholiday_backwd".split()
@@ -264,3 +264,6 @@ if False:
     test_in = np.split(xtest_nn_emb, xtest_nn_emb.shape[-1], axis=1) + [xtest_nn_num]
 
     preds = model.predict(test_in)
+
+    output = pd.DataFrame({'Id': list(range(1, 41089)), 'sales': preds.flatten()})
+    output.to_csv("correct_univar_unopt.csv", index=False)
