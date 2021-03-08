@@ -74,15 +74,23 @@ embedding_fts = "store dayofweek dayofyear stateholiday monthofyear dayofmonth s
 
 xtrain[embedding_fts] = xtrain[embedding_fts].astype('category')
 xval[embedding_fts] = xval[embedding_fts].astype('category')
+for ft in embedding_fts:
+    xtrain[ft] = xtrain[ft].cat.codes
+    xval[ft] = xval[ft].cat.codes
 
-xtrain_dummy, xval_dummy= pd.get_dummies(xtrain, sparse=True), pd.get_dummies(xval, sparse=True)
+
+#%%
+#from sklearn.feature_extraction import FeatureHasher
+#fh = FeatureHasher(n_features=100)
+#fh.fit_transform(xtrain[embedding_fts]) 
+
 
 #%%
 lr = LinearRegression()
-lr.fit(xtrain_dummy, ytrain)
+lr.fit(xtrain, ytrain)
 
 #%%
-rmspcte(yval, lr.predict(xval_dummy))
+rmspcte(yval, lr.predict(xval))
 
 
 

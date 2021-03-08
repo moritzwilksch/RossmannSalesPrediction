@@ -13,6 +13,7 @@ from RossmannSalesPrediction.helpers import feature_engineering
 import pandas as pd
 import numpy as np
 from helpers.evaluation import rmspe_loss
+from tensorflow.keras import backend as K
 
 
 
@@ -38,14 +39,6 @@ train = pd.merge(train, promo_elapsed, on=["date"], how='left')
 
 xtrain_raw, xval_raw, ytrain_raw, yval_raw = timeseries_ttsplit(train)
 
-#from sklearn.model_selection import train_test_split
-#
-#_trainset, _valset = train_test_split(train)
-#xtrain_raw = _trainset.drop('sales', axis=1)
-#xval_raw = _valset.drop('sales', axis=1)
-#ytrain_raw = _trainset.sales
-#yval_raw = _valset.sales
-
 
 xtrain, ytrain = (
     xtrain_raw
@@ -66,17 +59,6 @@ xval, yval = (
     .pipe(prep_for_model, y=yval_raw)  # must be last, returns x,y tuple
 )
 
-#lower_bound = np.quantile(ytrain, 0.01)
-#upper_bound = np.quantile(ytrain, 0.99)
-#
-#train_mask = (ytrain > lower_bound) & (ytrain < upper_bound)
-#xtrain = xtrain.loc[train_mask, :]
-#ytrain = ytrain[train_mask]
-#
-#xval = xval.loc[(yval > lower_bound) & (yval < upper_bound), :]
-#yval = yval[(yval > lower_bound) & (yval < upper_bound)]
-
-assert (xtrain.index == ytrain.index).all()
 
 #%%
 embedding_fts = "store dayofweek dayofyear stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
@@ -134,29 +116,36 @@ emb_table = {
     'storetype': 2,
     'assortment': 2,
     'promointerval': 2,
-    #'elapsed_promo_fwd': 5,
-    #'elapsed_promo_backwd': 5,
-    #'elapsed_schoolholiday_fwd': 5,
-    #'elapsed_schoolholiday_backwd': 5,
+    'elapsed_promo_fwd': 5,
+    'elapsed_promo_backwd': 5,
+    'elapsed_schoolholiday_fwd': 5,
+    'elapsed_schoolholiday_backwd': 5,
 }
 
 
 emb_layers = [keras.layers.Embedding(input_dim=dimtable[col]+1, output_dim=emb_table[col])(emb_inputs[idx]) for idx, col in enumerate(embedding_fts)]
 
-
-# num_dense = keras.layers.Dense(units=130, activation='relu', kernel_regularizer=keras.regularizers.l2())(num_input)
-
-
 flats = [keras.layers.Flatten()(x) for x in emb_layers + [num_input]]
 concat = keras.layers.Concatenate()(flats)
-hidden_dense = keras.layers.Dense(units=256, activation='relu', kernel_regularizer=keras.regularizers.l2())(concat)
+# concat = keras.layers.BatchNormalization()(concat)
+# concat = keras.layers.Dropout(0.2)(concat)
+
+hidden_dense = keras.layers.Dense(units=2**9, activation='relu', kernel_regularizer=keras.regularizers.l2())(concat)
+# hidden_dense = keras.layers.BatchNormalization()(hidden_dense)
+hidden_dense = keras.layers.Dropout(0.2)(hidden_dense)
 # hidden_dense = keras.layers.Dense(units=64, activation = 'relu', kernel_regularizer=keras.regularizers.l2())(hidden_dense)
-hidden_dense = keras.layers.Dense(units=128, activation='relu', kernel_regularizer=keras.regularizers.l2())(hidden_dense)
+
+hidden_dense = keras.layers.Dense(units=2**13, activation='relu', kernel_regularizer=keras.regularizers.l2())(hidden_dense)
+# hidden_dense = keras.layers.BatchNormalization()(hidden_dense)
+hidden_dense = keras.layers.Dropout(0.2)(hidden_dense)
+
+
 out = keras.layers.Dense(units=1, activation='linear', )(hidden_dense)  # bias_initializer=keras.initializers.Constant(ytrain.mean())
 
 model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
 
 #%%
+
 
 train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
 val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
@@ -180,8 +169,8 @@ def rmspe_loss(y_true, y_pred):
 
 
 lrf = lr_finder.LRFinder(1e-7, 1e-1)
-model.compile(optimizer='rmsprop', loss=rmspe_loss, metrics=[rmspe_loss])
-# model.fit(x=train_in, y=ytrain_scaled, callbacks=[lrf], validation_data=(val_in, yval_scaled), epochs=1, batch_size=512)
+model.compile(optimizer='adam', loss=rmspe_loss, metrics=[rmspe_loss])
+#model.fit(x=train_in, y=ytrain.values.flatten().astype(np.float32), callbacks=[lrf], validation_data=(val_in, yval.values.flatten().astype(np.float32)), epochs=1, batch_size=128)
 
 
 #%%
