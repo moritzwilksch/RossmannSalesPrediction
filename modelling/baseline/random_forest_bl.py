@@ -1,4 +1,8 @@
 # %%
+import sys
+import pathlib
+
+sys.path.append(str(pathlib.Path("..").resolve().parent.parent))
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
@@ -12,11 +16,7 @@ from RossmannSalesPrediction.helpers import lr_finder
 from RossmannSalesPrediction.helpers.evaluation import rmspcte
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
-import sys
-import pathlib
-
-sys.path.append(str(pathlib.Path("..").resolve().parent.parent))
-root_path = "../../../"
+root_path = "../../"
 
 #%%
 train = pd.read_csv(root_path + 'data/train.csv')
@@ -75,25 +75,23 @@ for col in embedding_fts:
 #%%
 
 rfr = RandomForestRegressor(n_jobs=-1)
-#rfr = LinearRegression(n_jobs=-1)
+
+
 rfr.fit(xtrain, ytrain)
-
-#%%
 preds = rfr.predict(xval)
-
-#%%
 rmspcte(yval, preds)
 
 #%%
-# REFIT WHOLE DATASET
+"""# REFIT WHOLE DATASET
 xall = pd.concat((xtrain, xval), axis=0)
 yall = pd.concat((ytrain, yval), axis=0)
 
-rfr.fit(xall, yall)
+rfr.fit(xall, yall)"""
+
 
 #%%
 # TEST SUBMISSION RANDOM FOREST
-if True:
+if False:
     test_raw = pd.read_csv(root_path + "data/test.csv").drop('Id', axis=1).reset_index(drop=True)
     test = fix_df(test_raw.copy())
 
