@@ -50,13 +50,15 @@ def join_store_details(data: pd.DataFrame) -> pd.DataFrame:
     store['promointerval'].cat.add_categories('NotRegular', inplace=True)
     store['promointerval'] = store['promointerval'].fillna('NotRegular')
 
-    store = store.drop("competitionopensincemonth competitionopensinceyear promo2sinceweek promo2sinceyear".split(), axis=1)
+    store = store.drop("promo2sinceweek promo2sinceyear".split(), axis=1)
 
     # impute competition distance to median of train set
     store['competitiondistance'] = store['competitiondistance'].fillna(2330.0)
 
-    return pd.merge(data, store, how='left', left_on='store', right_index=True)
-
+    data = pd.merge(data, store, how='left', left_on='store', right_index=True)
+    data['competitionopen'] = 12 * (data.date.dt.year - data.competitionopensinceyear) + (data.date.dt.month - data.competitionopensincemonth)
+    data['competitionopen'] = data['competitionopen'].apply(lambda x: x if x > 0 else 0)
+    return data
 
 def add_time_lag(x: pd.DataFrame, y: pd.Series, lag: int) -> pd.DataFrame:
     train = pd.concat((x, y), axis=1)

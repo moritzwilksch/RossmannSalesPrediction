@@ -46,6 +46,7 @@ xtrain, ytrain = (
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
+    .drop(["competitionopensincemonth", "competitionopensinceyear"], axis=1)
     .pipe(prep_for_model, y=ytrain_raw)  # must be last, returns x,y tuple
 )
 
@@ -56,6 +57,7 @@ xval, yval = (
     .pipe(feature_engineering.add_avg_customers_per_store, train_data=xtrain_raw)
     .pipe(feature_engineering.add_avg_sales_per_store, xtrain=xtrain_raw, ytrain=ytrain_raw)
     .pipe(feature_engineering.join_store_details)
+    .drop(["competitionopensincemonth", "competitionopensinceyear"], axis=1)
     .pipe(prep_for_model, y=yval_raw)  # must be last, returns x,y tuple
 )
 
