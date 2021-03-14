@@ -302,4 +302,4 @@ if False:
     preds = model.predict(test_in)
 
     output = pd.DataFrame({'Id': list(range(1, 41089)), 'sales': preds.flatten()})
-    output.to_csv("correct_univar_unopt.csv", index=False)
+    output.to_csv(root_path + "data/submissions/final_submission.csv", index=False)
