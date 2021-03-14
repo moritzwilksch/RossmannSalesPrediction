@@ -21,6 +21,7 @@ from tensorflow.keras import backend as K
 root_path = "../../"
 
 #%%
+# Loading & prepping data using helpers
 train = pd.read_csv(root_path + 'data/train.csv')
 train = fix_df(train)
 
@@ -63,6 +64,7 @@ xval, yval = (
 
 
 #%%
+# feature column names
 embedding_fts = "store dayofweek dayofyear stateholiday monthofyear dayofmonth storetype assortment promointerval weekofyear".split()
 
 to_be_encoded = embedding_fts  # "stateholiday storetype assortment promointerval weekofyear".split()
@@ -86,6 +88,7 @@ ct = ColumnTransformer([
 ct.fit(xtrain)
 
 #%%
+# prep different embedding/numeric inputs
 xtrain_nn = pd.DataFrame(ct.transform(xtrain), columns=leaveasis + to_be_encoded + to_be_scaled)
 xval_nn = pd.DataFrame(ct.transform(xval), columns=leaveasis + to_be_encoded + to_be_scaled)
 
@@ -104,6 +107,7 @@ from tensorflow import keras
 
 dimtable = {k: v for k, v in zip(embedding_fts, [xtrain_nn[col].nunique() for col in embedding_fts])}
 #%%
+# build neural net
 num_input = keras.Input(shape=(xtrain_nn_num.shape[1], ))
 emb_inputs = [keras.Input(shape=(1, )) for _ in embedding_fts]
 
@@ -148,7 +152,7 @@ model: keras.Model = keras.Model(inputs=emb_inputs + [num_input], outputs=out)
 
 #%%
 
-
+# net input
 train_in = np.split(xtrain_nn_emb, xtrain_nn_emb.shape[-1], axis=1) + [xtrain_nn_num]
 val_in = np.split(xval_nn_emb, xval_nn_emb.shape[-1], axis=1) + [xval_nn_num]
 print(f"Input shape = (nrows, {sum(x.shape[1] for x in train_in)})")
@@ -169,28 +173,54 @@ def rmspe_loss(y_true, y_pred):
                                  K.clip(K.abs(y_true), K.epsilon(), None) + 1e-6), axis=-1))
     return sum*100
 
-
+# Smith (2018): Learning rate range plot
 lrf = lr_finder.LRFinder(1e-7, 1e-1)
 model.compile(optimizer='adam', loss=rmspe_loss, metrics=[rmspe_loss])
 #model.fit(x=train_in, y=ytrain.values.flatten().astype(np.float32), callbacks=[lrf], validation_data=(val_in, yval.values.flatten().astype(np.float32)), epochs=1, batch_size=128)
 
+#%%
+# ONE cycle policy
+EPOCHS = 30
+def clr_scheduler(epoch, lr):
+
+    maxlr = 10**-2
+    minlr = 1e-3
+
+    if epoch > EPOCHS:
+        return minlr
+
+    step_size = (maxlr - minlr)/(EPOCHS/2)
+    return maxlr - np.abs(EPOCHS/2 - epoch)*step_size
+
+
+plt.plot([clr_scheduler(x, 0) for x in range(36)])
+plt.title("Learning Rate Over Time")
+plt.xlabel("Epoch",)
+plt.ylabel("Learning Rate",)
+plt.xticks([x for x in range(0, 36, 5)])
+
 
 #%%
+# Real training loop
 from tensorflow.keras.callbacks import ModelCheckpoint
-mcp = ModelCheckpoint('.modelcheckpoint', save_best_only=True, save_weights_only=True)
+mcp = ModelCheckpoint('modelcheckpoint', save_best_only=True, save_weights_only=True)
 
 if SCALE_TARGET:
-    model.compile(optimizer=keras.optimizers.Adam(), loss='mean_absolute_error', metrics=['mean_absolute_error'])
-    hist = model.fit(x=train_in, y=ytrain_scaled.astype(np.float32), validation_data=(val_in, yval_scaled.flatten().astype(np.float32)), epochs=5, batch_size=512, callbacks=[mcp])
+    model.compile(optimizer=keras.optimizers.Adam(1e-2), loss='mean_absolute_error', metrics=['mean_absolute_error'])
+    hist = model.fit(x=train_in, y=ytrain_scaled.astype(np.float32), validation_data=(val_in, yval_scaled.flatten().astype(np.float32)), epochs=10, batch_size=512, callbacks=[mcp])
 else:
-    model.compile(optimizer=keras.optimizers.Adam(), loss=rmspe_loss, metrics=[rmspe_loss])
-    hist = model.fit(x=train_in, y=ytrain.values.flatten().astype(np.float32), validation_data=(
-        val_in, yval.values.flatten().astype(np.float32)), epochs=5, batch_size=512, callbacks=[mcp])
+    model.compile(optimizer=keras.optimizers.Adam(1e-2), loss=rmspe_loss, metrics=[rmspe_loss])
+    #hist = model.fit(x=train_in, y=ytrain.values.flatten().astype(np.float32), validation_data=(val_in, yval.values.flatten().astype(np.float32)), epochs=10, batch_size=256, callbacks=[mcp, keras.callbacks.ReduceLROnPlateau(patience=2)])
+    hist = model.fit(x=train_in, y=ytrain.values.flatten().astype(np.float32), validation_data=(val_in, yval.values.flatten().astype(np.float32)),
+                     epochs=35, batch_size=512, callbacks=[mcp, keras.callbacks.LearningRateScheduler(clr_scheduler)])
+
+    # SANITY CHECK: # hist = model.fit(x=[x[:2] for x in train_in], y=ytrain.values.flatten()[:2].astype(np.float32), epochs=100, batch_size=32)
 
 
-model.load_weights(".modelcheckpoint")
+model.load_weights("modelcheckpoint")
 
 #%%
+# Plot training
 import seaborn as sns
 plt.plot(hist.history['loss'], label='train')
 plt.plot(hist.history['val_loss'], label='val')
@@ -209,6 +239,21 @@ sns.histplot(preds, color='orange')
 sns.histplot(yval)
 plt.show()
 
+#%%
+if False:
+    # Retrain on whole dataset
+    re_train = [np.vstack([train_in[i], val_in[i]]) for i in range(len(train_in))]
+    re_y = np.vstack([ytrain.values.reshape(-1, 1), yval.values.reshape(-1, 1)])
+
+
+    #model.compile(optimizer=keras.optimizers.Adam(1e-2), loss=rmspe_loss, metrics=[rmspe_loss])
+    #hist = model.fit(x=re_train, y=re_y.astype(np.float32), validation_data=(val_in, yval.values.flatten().astype(np.float32)), epochs=10, batch_size=512, callbacks=[mcp])
+
+    model.compile(optimizer=keras.optimizers.Adam(1e-2), loss=rmspe_loss, metrics=[rmspe_loss])
+    model.fit(x=re_train, y=re_y.flatten().astype(np.float32), validation_data=(val_in, yval.values.flatten().astype(np.float32)),
+            epochs=25, batch_size=512, callbacks=[mcp, keras.callbacks.LearningRateScheduler(clr_scheduler)])
+
+    model.load_weights("modelcheckpoint")
 #%%
 if False:
     # TEST SUBMISSION

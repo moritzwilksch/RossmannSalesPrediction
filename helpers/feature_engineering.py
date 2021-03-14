@@ -6,8 +6,7 @@ import sys
 import pathlib
 sys.path.append(str(pathlib.Path("..").resolve().parent.parent))
 
-
-root_path = "../"
+root_path = "../../"
 
 # %%
 
