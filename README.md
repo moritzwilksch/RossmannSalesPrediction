@@ -18,6 +18,8 @@ Rossmann sales prediction project from kaggle
 
 
 # Model Stats
+- Root Means Squared Percentage Error
+
 |Model | Validation | Test |
 | ----- | ----------| -----|
 |Mean | 0.536 | 0.533 |
