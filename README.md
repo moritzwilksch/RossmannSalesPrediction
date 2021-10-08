@@ -1,6 +1,9 @@
 # RossmannSalesPrediction
 Rossmann sales prediction project from kaggle
 
+<img width=200 src="https://user-images.githubusercontent.com/58488209/136593674-d9b51420-a110-4f30-a57e-5709818be3e3.png">
+
+
 
 # Repo Organization
 - `data`: all data sets as csv
